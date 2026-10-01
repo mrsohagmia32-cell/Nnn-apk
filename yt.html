@@ -2,34 +2,30 @@
 <html lang="bn">
 <head>
     <meta charset="UTF-8">
-    <title>গিটহাব কানেক্টেড এডমিন প্যানেল</title>
+    <title>এডমিন প্যানেল - অ্যাপ আপলোড</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f4f9; padding: 20px; }
         .box { max-width: 600px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         input, textarea { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 12px; background: #007bff; color: #fff; border: none; cursor: pointer; width: 100%; border-radius: 4px; font-size: 16px; }
+        button { padding: 12px; background: #007bff; color: #fff; border: none; cursor: pointer; width: 100%; border-radius: 4px; font-size: 16px; margin-top: 5px; }
         button:hover { background: #0056b3; }
         .config-box { background: #e9ecef; padding: 15px; margin-bottom: 20px; border-radius: 5px; border: 1px dashed #adb5bd; }
-        .saved-badge { color: green; font-size: 12px; font-weight: bold; float: right; }
+        .success-msg { color: green; font-size: 14px; font-weight: bold; text-align: center; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>এডমিন প্যানেল - অ্যাপ আপলোড</h2>
+    <h2>এডমিন প্যানেল</h2>
     
-    <!-- গিটহাব সেটিংস বক্স -->
+    <!-- গিটহাব টোকেন সেট করার বক্স -->
     <div class="config-box">
-        <h3>গিটহাব সেটিংস <span id="saveStatus" class="saved-badge"></span></h3>
-        <label>গিটহাব ইউজারনেম:</label>
-        <input type="text" id="gh_user" placeholder="যেমন: bsbhai" oninput="autoSaveConfig()">
-        
-        <label>রিপোজিটরি নাম:</label>
-        <input type="text" id="gh_repo" placeholder="যেমন: app-store-repo" oninput="autoSaveConfig()">
-        
+        <h3>গিটহাব অ্যাক্সেস টোকেন সেটিংস</h3>
+        <p style="font-size: 13px; color: #555; margin-bottom: 10px;">টোকেনটি শুধু একবার এখানে দিয়ে সেভ বাটনে চাপুন। ব্রাউজারে এটি সেট হয়ে যাবে।</p>
         <label>গিটহাব পার্সোনাল অ্যাক্সেস টোকেন (PAT):</label>
-        <input type="password" id="gh_token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" oninput="autoSaveConfig()">
-        <small style="color: #666;">টোকেন বা নাম একবার লিখলেই ব্রাউজারে চিরতরে সেভ হয়ে থাকবে, বারবার লিখতে হবে না।</small>
+        <input type="password" id="gh_token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+        <button onclick="saveToken()" style="background: #28a745;">টোকেন ব্রাউজারে সেট করুন</button>
+        <div id="token_status" class="success-msg"></div>
     </div>
 
     <hr style="margin: 20px 0;">
@@ -52,106 +48,121 @@
 </div>
 
 <script>
-// পেজ লোড হওয়ার সাথে সাথে লোকালস্টোরেজ থেকে ডেটা ইনপুট বক্সে বসিয়ে দেওয়া
-window.addEventListener('DOMContentLoaded', (event) => {
-    if(localStorage.getItem('gh_user')) document.getElementById('gh_user').value = localStorage.getItem('gh_user');
-    if(localStorage.getItem('gh_repo')) document.getElementById('gh_repo').value = localStorage.getItem('gh_repo');
-    if(localStorage.getItem('gh_token')) document.getElementById('gh_token').value = localStorage.getItem('gh_token');
-});
+    // ----------------------------------------------------
+    // এখানে আপনার গিটহাব ইউজারনেম এবং রিপোজিটরি নাম বসিয়ে দিন (মাত্র একবার)
+    // ----------------------------------------------------
+    const GITHUB_USER = "bsbhai";          // আপনার গিটহাব ইউজারনেম
+    const GITHUB_REPO = "app-store-repo";  // আপনার গিটহাব রিপোজিটরি নাম
 
-// কিছু টাইপ করার সাথে সাথেই অটোমেটিক সেভ হয়ে যাবে (বারবার সেভ বাটন চাপতে হবে না)
-function autoSaveConfig() {
-    const user = document.getElementById('gh_user').value.trim();
-    const repo = document.getElementById('gh_repo').value.trim();
-    const token = document.getElementById('gh_token').value.trim();
-
-    localStorage.setItem('gh_user', user);
-    localStorage.setItem('gh_repo', repo);
-    localStorage.setItem('gh_token', token);
-
-    let badge = document.getElementById('saveStatus');
-    badge.innerText = "✓ স্বয়ংক্রিয়ভাবে সংরক্ষিত!";
-    setTimeout(() => { badge.innerText = ""; }, 2000);
-}
-
-async function uploadAppToGitHub() {
-    const user = document.getElementById('gh_user').value.trim();
-    const repo = document.getElementById('gh_repo').value.trim();
-    const token = document.getElementById('gh_token').value.trim();
-    
-    const title = document.getElementById('app_title').value.trim();
-    const description = document.getElementById('app_desc').value.trim();
-    const link = document.getElementById('app_link').value.trim();
-    const icon = document.getElementById('app_icon').value.trim();
-    const status = document.getElementById('status');
-
-    if (!user || !repo || !token || !title || !link) {
-        status.style.color = "red";
-        status.innerText = "দয়া করে গিটহাব কনফিগারেশন এবং অ্যাপের তথ্যগুলো সঠিকভাবে পূরণ করুন!";
-        return;
-    }
-
-    // ফাইনাল সেভ শিওর করা
-    autoSaveConfig();
-
-    status.style.color = "blue";
-    status.innerText = "গিটহাবে ডেটা পাঠানো হচ্ছে, দয়া করে অপেক্ষা করুন...";
-
-    const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/apps.json`;
-    const headers = {
-        "Authorization": `token ${token}`,
-        "Accept": "application/vnd.github.v3+json"
+    // পেজ লোড হলে সেভ করা টোকেন ইনপুট বক্সে বসিয়ে দেওয়া
+    window.onload = function() {
+        if(localStorage.getItem('gh_token')) {
+            document.getElementById('gh_token').value = localStorage.getItem('gh_token');
+            document.getElementById('token_status').innerText = "✓ টোকেন ব্রাউজারে সক্রিয় আছে।";
+        }
     };
 
-    try {
-        let response = await fetch(apiUrl, { headers: headers });
-        let existingApps = [];
-        let fileSha = "";
+    // টোকেন আলাদাভাবে সেভ করার বাটন ফাংশন
+    function saveToken() {
+        const token = document.getElementById('gh_token').value.trim();
+        const tokenStatus = document.getElementById('token_status');
 
-        if (response.ok) {
-            let fileData = await response.json();
-            fileSha = fileData.sha;
-            let decodedContent = decodeURIComponent(escape(atob(fileData.content)));
-            existingApps = JSON.parse(decodedContent);
+        if (!token) {
+            tokenStatus.style.color = "red";
+            tokenStatus.innerText = "দয়া করে আগে একটি টোকেন লিখুন!";
+            return;
         }
 
-        existingApps.unshift({
-            title: title,
-            description: description,
-            link: link,
-            icon: icon || "https://via.placeholder.com/60"
-        });
-
-        let updatedContent = btoa(unescape(encodeURIComponent(JSON.stringify(existingApps, null, 2))));
-
-        let updateResponse = await fetch(apiUrl, {
-            method: "PUT",
-            headers: headers,
-            body: JSON.stringify({
-                message: `Admin Panel: Add app - ${title}`,
-                content: updatedContent,
-                sha: fileSha
-            })
-        });
-
-        if (updateResponse.ok) {
-            status.style.color = "green";
-            status.innerText = "আলহামদুলিল্লাহ! অ্যাপ সফলভাবে পাবলিশ হয়েছে!";
-            document.getElementById('app_title').value = "";
-            document.getElementById('app_desc').value = "";
-            document.getElementById('app_link').value = "";
-            document.getElementById('app_icon').value = "";
-        } else {
-            let errData = await updateResponse.json();
-            status.style.color = "red";
-            status.innerText = "ত্রুটি: " + (errData.message || "টোকেন বা রিপোজিটরি নাম ভুল হতে পারে।");
-        }
-
-    } catch (error) {
-        status.style.color = "red";
-        status.innerText = "নেটওয়ার্ক ত্রুটি: " + error.message;
+        localStorage.setItem('gh_token', token);
+        tokenStatus.style.color = "green";
+        tokenStatus.innerText = "আলহামদুলিল্লাহ! টোকেন সফলভাবে ব্রাউজারে সেট হয়ে গেছে।";
+        setTimeout(() => { tokenStatus.innerText = "✓ টোকেন ব্রাউজারে সক্রিয় আছে।"; }, 3000);
     }
-}
+
+    // গিটহাবে অ্যাপ আপলোড করার মূল ফাংশন
+    async function uploadAppToGitHub() {
+        const token = localStorage.getItem('gh_token') || document.getElementById('gh_token').value.trim();
+        
+        const title = document.getElementById('app_title').value.trim();
+        const description = document.getElementById('app_desc').value.trim();
+        const link = document.getElementById('app_link').value.trim();
+        const icon = document.getElementById('app_icon').value.trim();
+        const status = document.getElementById('status');
+
+        if (!token) {
+            status.style.color = "red";
+            status.innerText = "আগে উপরের বক্সে গিটহাব টোকেন দিয়ে 'টোকেন ব্রাউজারে সেট করুন' বাটনে চাপুন!";
+            return;
+        }
+
+        if (!title || !link) {
+            status.style.color = "red";
+            status.innerText = "দয়া করে অ্যাপের নাম এবং ডাউনলোড লিংক দিন!";
+            return;
+        }
+
+        status.style.color = "blue";
+        status.innerText = "গিটহাবে ডেটা পাঠানো হচ্ছে, দয়া করে অপেক্ষা করুন...";
+
+        const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/apps.json`;
+        const headers = {
+            "Authorization": `token ${token}`,
+            "Accept": "application/vnd.github.v3+json"
+        };
+
+        try {
+            // ১. গিটহাব থেকে বর্তমান apps.json ফাইল ফেচ করা
+            let response = await fetch(apiUrl, { headers: headers });
+            let existingApps = [];
+            let fileSha = "";
+
+            if (response.ok) {
+                let fileData = await response.json();
+                fileSha = fileData.sha;
+                let decodedContent = decodeURIComponent(escape(atob(fileData.content)));
+                existingApps = JSON.parse(decodedContent);
+            }
+
+            // ২. নতুন অ্যাপটি অ্যারেতে যুক্ত করা
+            existingApps.unshift({
+                title: title,
+                description: description,
+                link: link,
+                icon: icon || "https://via.placeholder.com/60"
+            });
+
+            // ৩. ডেটা এনকোড করা
+            let updatedContent = btoa(unescape(encodeURIComponent(JSON.stringify(existingApps, null, 2))));
+
+            // ৪. গিটহাভে রিকোয়েস্ট পাঠানো
+            let updateResponse = await fetch(apiUrl, {
+                method: "PUT",
+                headers: headers,
+                body: JSON.stringify({
+                    message: `Admin Panel: Add app - ${title}`,
+                    content: updatedContent,
+                    sha: fileSha
+                })
+            });
+
+            if (updateResponse.ok) {
+                status.style.color = "green";
+                status.innerText = "আলহামদুলিল্লাহ! অ্যাপ সফলভাবে পাবলিশ হয়েছে!";
+                document.getElementById('app_title').value = "";
+                document.getElementById('app_desc').value = "";
+                document.getElementById('app_link').value = "";
+                document.getElementById('app_icon').value = "";
+            } else {
+                let errData = await updateResponse.json();
+                status.style.color = "red";
+                status.innerText = "ত্রুটি: " + (errData.message || "টোকেন ভুল বা মেয়াদোত্তীর্ণ হতে পারে।");
+            }
+
+        } catch (error) {
+            status.style.color = "red";
+            status.innerText = "নেটওয়ার্ক ত্রুটি: " + error.message;
+        }
+    }
 </script>
 
 </body>
