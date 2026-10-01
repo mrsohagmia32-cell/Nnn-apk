@@ -10,6 +10,7 @@
         button { padding: 12px; background: #007bff; color: #fff; border: none; cursor: pointer; width: 100%; border-radius: 4px; font-size: 16px; }
         button:hover { background: #0056b3; }
         .config-box { background: #e9ecef; padding: 15px; margin-bottom: 20px; border-radius: 5px; border: 1px dashed #adb5bd; }
+        .saved-badge { color: green; font-size: 12px; font-weight: bold; float: right; }
     </style>
 </head>
 <body>
@@ -17,17 +18,18 @@
 <div class="box">
     <h2>এডমিন প্যানেল - অ্যাপ আপলোড</h2>
     
-    <!-- গিটহাব ক্রেডেনশিয়াল বা টোকেন দেওয়ার বক্স (কোডে বসাতে হবে না, এখানে বসাবেন) -->
+    <!-- গিটহাব সেটিংস বক্স -->
     <div class="config-box">
-        <h3>গিটহাব সেটিংস (প্রতিবার বা একবার বসিয়ে নিন)</h3>
+        <h3>গিটহাব সেটিংস <span id="saveStatus" class="saved-badge"></span></h3>
         <label>গিটহাব ইউজারনেম:</label>
-        <input type="text" id="gh_user" placeholder="যেমন: bsbhai">
+        <input type="text" id="gh_user" placeholder="যেমন: bsbhai" oninput="autoSaveConfig()">
         
         <label>রিপোজিটরি নাম:</label>
-        <input type="text" id="gh_repo" placeholder="যেমন: app-store-repo">
+        <input type="text" id="gh_repo" placeholder="যেমন: app-store-repo" oninput="autoSaveConfig()">
         
         <label>গিটহাব পার্সোনাল অ্যাক্সেস টোকেন (PAT):</label>
-        <input type="password" id="gh_token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+        <input type="password" id="gh_token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" oninput="autoSaveConfig()">
+        <small style="color: #666;">টোকেন বা নাম একবার লিখলেই ব্রাউজারে চিরতরে সেভ হয়ে থাকবে, বারবার লিখতে হবে না।</small>
     </div>
 
     <hr style="margin: 20px 0;">
@@ -50,12 +52,27 @@
 </div>
 
 <script>
-// ব্রাউজারের লোকাল স্টোরেজে টোকেন সেভ করে রাখার ব্যবস্থা, যাতে বারবার টাইপ করা না লাগে
-window.onload = function() {
+// পেজ লোড হওয়ার সাথে সাথে লোকালস্টোরেজ থেকে ডেটা ইনপুট বক্সে বসিয়ে দেওয়া
+window.addEventListener('DOMContentLoaded', (event) => {
     if(localStorage.getItem('gh_user')) document.getElementById('gh_user').value = localStorage.getItem('gh_user');
     if(localStorage.getItem('gh_repo')) document.getElementById('gh_repo').value = localStorage.getItem('gh_repo');
     if(localStorage.getItem('gh_token')) document.getElementById('gh_token').value = localStorage.getItem('gh_token');
-};
+});
+
+// কিছু টাইপ করার সাথে সাথেই অটোমেটিক সেভ হয়ে যাবে (বারবার সেভ বাটন চাপতে হবে না)
+function autoSaveConfig() {
+    const user = document.getElementById('gh_user').value.trim();
+    const repo = document.getElementById('gh_repo').value.trim();
+    const token = document.getElementById('gh_token').value.trim();
+
+    localStorage.setItem('gh_user', user);
+    localStorage.setItem('gh_repo', repo);
+    localStorage.setItem('gh_token', token);
+
+    let badge = document.getElementById('saveStatus');
+    badge.innerText = "✓ স্বয়ংক্রিয়ভাবে সংরক্ষিত!";
+    setTimeout(() => { badge.innerText = ""; }, 2000);
+}
 
 async function uploadAppToGitHub() {
     const user = document.getElementById('gh_user').value.trim();
@@ -74,10 +91,8 @@ async function uploadAppToGitHub() {
         return;
     }
 
-    // টোকেন লোকাল স্টোরেজে সেভ করে রাখা সুবিধার জন্য
-    localStorage.setItem('gh_user', user);
-    localStorage.setItem('gh_repo', repo);
-    localStorage.setItem('gh_token', token);
+    // ফাইনাল সেভ শিওর করা
+    autoSaveConfig();
 
     status.style.color = "blue";
     status.innerText = "গিটহাবে ডেটা পাঠানো হচ্ছে, দয়া করে অপেক্ষা করুন...";
@@ -89,7 +104,6 @@ async function uploadAppToGitHub() {
     };
 
     try {
-        // ১. গিটহাব থেকে বর্তমান apps.json ফাইল ফেচ করা
         let response = await fetch(apiUrl, { headers: headers });
         let existingApps = [];
         let fileSha = "";
@@ -101,7 +115,6 @@ async function uploadAppToGitHub() {
             existingApps = JSON.parse(decodedContent);
         }
 
-        // ২. নতুন অ্যাপটি অ্যারেতে যুক্ত করা
         existingApps.unshift({
             title: title,
             description: description,
@@ -109,10 +122,8 @@ async function uploadAppToGitHub() {
             icon: icon || "https://via.placeholder.com/60"
         });
 
-        // ৩. ডেটা এনকোড করা
         let updatedContent = btoa(unescape(encodeURIComponent(JSON.stringify(existingApps, null, 2))));
 
-        // ৪. গিটহাভে রিকোয়েস্ট পাঠানো
         let updateResponse = await fetch(apiUrl, {
             method: "PUT",
             headers: headers,
