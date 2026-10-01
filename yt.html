@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <title>গিটহাব কানেক্টেড এডমিন প্যানেল</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f9; padding: 20px; }
+        .box { max-width: 600px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        input, textarea { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 12px; background: #007bff; color: #fff; border: none; cursor: pointer; width: 100%; border-radius: 4px; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        .config-box { background: #e9ecef; padding: 15px; margin-bottom: 20px; border-radius: 5px; border: 1px dashed #adb5bd; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>এডমিন প্যানেল - অ্যাপ আপলোড</h2>
+    
+    <!-- গিটহাব ক্রেডেনশিয়াল বা টোকেন দেওয়ার বক্স (কোডে বসাতে হবে না, এখানে বসাবেন) -->
+    <div class="config-box">
+        <h3>গিটহাব সেটিংস (প্রতিবার বা একবার বসিয়ে নিন)</h3>
+        <label>গিটহাব ইউজারনেম:</label>
+        <input type="text" id="gh_user" placeholder="যেমন: bsbhai">
+        
+        <label>রিপোজিটরি নাম:</label>
+        <input type="text" id="gh_repo" placeholder="যেমন: app-store-repo">
+        
+        <label>গিটহাব পার্সোনাল অ্যাক্সেস টোকেন (PAT):</label>
+        <input type="password" id="gh_token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+    </div>
+
+    <hr style="margin: 20px 0;">
+
+    <h3>নতুন অ্যাপ যোগ করুন</h3>
+    <label>অ্যাপের নাম:</label>
+    <input type="text" id="app_title" placeholder="অ্যাপের নাম লিখুন" required>
+    
+    <label>অ্যাপের বিবরণ:</label>
+    <textarea id="app_desc" rows="3" placeholder="অ্যাপের সংক্ষিপ্ত বিবরণ..." required></textarea>
+    
+    <label>ডাউনলোড লিংক (Free Hosting/MediaFire/Drive):</label>
+    <input type="url" id="app_link" placeholder="https://..." required>
+    
+    <label>অ্যাপ আইকন ইমেজ লিংক:</label>
+    <input type="url" id="app_icon" placeholder="https://... (লোগো লিংক)">
+
+    <button onclick="uploadAppToGitHub()">অ্যাপ পাবলিশ করুন</button>
+    <p id="status" style="margin-top: 15px; font-weight: bold; text-align: center;"></p>
+</div>
+
+<script>
+// ব্রাউজারের লোকাল স্টোরেজে টোকেন সেভ করে রাখার ব্যবস্থা, যাতে বারবার টাইপ করা না লাগে
+window.onload = function() {
+    if(localStorage.getItem('gh_user')) document.getElementById('gh_user').value = localStorage.getItem('gh_user');
+    if(localStorage.getItem('gh_repo')) document.getElementById('gh_repo').value = localStorage.getItem('gh_repo');
+    if(localStorage.getItem('gh_token')) document.getElementById('gh_token').value = localStorage.getItem('gh_token');
+};
+
+async function uploadAppToGitHub() {
+    const user = document.getElementById('gh_user').value.trim();
+    const repo = document.getElementById('gh_repo').value.trim();
+    const token = document.getElementById('gh_token').value.trim();
+    
+    const title = document.getElementById('app_title').value.trim();
+    const description = document.getElementById('app_desc').value.trim();
+    const link = document.getElementById('app_link').value.trim();
+    const icon = document.getElementById('app_icon').value.trim();
+    const status = document.getElementById('status');
+
+    if (!user || !repo || !token || !title || !link) {
+        status.style.color = "red";
+        status.innerText = "দয়া করে গিটহাব কনফিগারেশন এবং অ্যাপের তথ্যগুলো সঠিকভাবে পূরণ করুন!";
+        return;
+    }
+
+    // টোকেন লোকাল স্টোরেজে সেভ করে রাখা সুবিধার জন্য
+    localStorage.setItem('gh_user', user);
+    localStorage.setItem('gh_repo', repo);
+    localStorage.setItem('gh_token', token);
+
+    status.style.color = "blue";
+    status.innerText = "গিটহাবে ডেটা পাঠানো হচ্ছে, দয়া করে অপেক্ষা করুন...";
+
+    const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/apps.json`;
+    const headers = {
+        "Authorization": `token ${token}`,
+        "Accept": "application/vnd.github.v3+json"
+    };
+
+    try {
+        // ১. গিটহাব থেকে বর্তমান apps.json ফাইল ফেচ করা
+        let response = await fetch(apiUrl, { headers: headers });
+        let existingApps = [];
+        let fileSha = "";
+
+        if (response.ok) {
+            let fileData = await response.json();
+            fileSha = fileData.sha;
+            let decodedContent = decodeURIComponent(escape(atob(fileData.content)));
+            existingApps = JSON.parse(decodedContent);
+        }
+
+        // ২. নতুন অ্যাপটি অ্যারেতে যুক্ত করা
+        existingApps.unshift({
+            title: title,
+            description: description,
+            link: link,
+            icon: icon || "https://via.placeholder.com/60"
+        });
+
+        // ৩. ডেটা এনকোড করা
+        let updatedContent = btoa(unescape(encodeURIComponent(JSON.stringify(existingApps, null, 2))));
+
+        // ৪. গিটহাভে রিকোয়েস্ট পাঠানো
+        let updateResponse = await fetch(apiUrl, {
+            method: "PUT",
+            headers: headers,
+            body: JSON.stringify({
+                message: `Admin Panel: Add app - ${title}`,
+                content: updatedContent,
+                sha: fileSha
+            })
+        });
+
+        if (updateResponse.ok) {
+            status.style.color = "green";
+            status.innerText = "আলহামদুলিল্লাহ! অ্যাপ সফলভাবে পাবলিশ হয়েছে!";
+            document.getElementById('app_title').value = "";
+            document.getElementById('app_desc').value = "";
+            document.getElementById('app_link').value = "";
+            document.getElementById('app_icon').value = "";
+        } else {
+            let errData = await updateResponse.json();
+            status.style.color = "red";
+            status.innerText = "ত্রুটি: " + (errData.message || "টোকেন বা রিপোজিটরি নাম ভুল হতে পারে।");
+        }
+
+    } catch (error) {
+        status.style.color = "red";
+        status.innerText = "নেটওয়ার্ক ত্রুটি: " + error.message;
+    }
+}
+</script>
+
+</body>
+</html>
